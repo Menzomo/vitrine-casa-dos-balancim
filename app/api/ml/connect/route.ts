@@ -23,6 +23,9 @@ export async function GET() {
   authorizeUrl.searchParams.set('client_id', process.env.ML_CLIENT_ID!)
   authorizeUrl.searchParams.set('redirect_uri', process.env.ML_REDIRECT_URI!)
   authorizeUrl.searchParams.set('state', state)
+  // offline_access é o que garante um refresh_token na resposta do token
+  // (sem ele o acesso provavelmente expira em ~6h sem forma de renovar).
+  authorizeUrl.searchParams.set('scope', 'offline_access read')
 
   return NextResponse.redirect(authorizeUrl)
 }
