@@ -8,6 +8,19 @@ import { getValidMlToken } from '@/lib/ml/token'
 // no fim da carga.
 const ALLOWED_CATEGORY_IDS = new Set(['MLB194177', 'MLB193389', 'MLB237416'])
 
+// Normaliza a marca extraída do catálogo do ML pro nome que o site usa.
+// "Chevrolet" -> "GM" (GM é a marca já usada no site); variações de
+// grafia (ex: "Mercedes-benz") viram a forma canônica.
+const BRAND_ALIASES: Record<string, string> = {
+  chevrolet: 'GM',
+  'mercedes-benz': 'Mercedes-Benz',
+}
+
+function normalizeBrand(raw: string | null): string | null {
+  if (!raw) return null
+  return BRAND_ALIASES[raw.toLowerCase()] ?? raw
+}
+
 const ML_API = 'https://api.mercadolibre.com'
 const UA = { 'User-Agent': 'CasaDosBalancim-Integracao/1.0' }
 
@@ -112,7 +125,7 @@ export async function GET() {
         const compat = (await compatRes.json()) as MlCompatibility
         compatibilities = compat.products ?? []
         const firstName = compatibilities[0]?.catalog_product_name
-        brandGuess = firstName ? firstName.split(' ')[0] : null
+        brandGuess = normalizeBrand(firstName ? firstName.split(' ')[0] : null)
       }
     } catch {
       // sem compatibilidade cadastrada ou falha pontual — segue sem marca
