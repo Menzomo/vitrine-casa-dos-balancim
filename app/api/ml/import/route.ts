@@ -6,7 +6,7 @@ import { getValidMlToken } from '@/lib/ml/token'
 // vendedor também tem produtos fora desse escopo (bola de engate, união
 // sanitária) que ficam de fora por enquanto — ver relatório de "ignorados"
 // no fim da carga.
-const ALLOWED_CATEGORY_IDS = new Set(['MLB194177', 'MLB193389'])
+const ALLOWED_CATEGORY_IDS = new Set(['MLB194177', 'MLB193389', 'MLB237416'])
 
 const ML_API = 'https://api.mercadolibre.com'
 const UA = { 'User-Agent': 'CasaDosBalancim-Integracao/1.0' }
