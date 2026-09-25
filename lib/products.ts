@@ -23,6 +23,7 @@ export interface Product {
   brand: string | null
   engine: string | null
   applications: Application[]
+  description: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -39,12 +40,13 @@ type ProductRow = {
   brand: string | null
   engine: string | null
   applications: Application[] | null
+  description: string | null
   created_at: string
   updated_at: string
 }
 
 const SELECT_COLUMNS =
-  'ml_item_id, title, price, stock, status, images, permalink, category, brand, engine, applications, created_at, updated_at'
+  'ml_item_id, title, price, stock, status, images, permalink, category, brand, engine, applications, description, created_at, updated_at'
 
 function mapRow(row: ProductRow): Product {
   return {
@@ -59,6 +61,7 @@ function mapRow(row: ProductRow): Product {
     brand: row.brand,
     engine: row.engine,
     applications: row.applications ?? [],
+    description: row.description,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   }

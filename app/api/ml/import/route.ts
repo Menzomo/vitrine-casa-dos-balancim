@@ -43,6 +43,11 @@ type MlCompatibility = {
   products?: { catalog_product_name: string }[]
 }
 
+type MlDescription = {
+  text?: string
+  plain_text?: string
+}
+
 // Carga inicial (etapa 4): busca todos os anúncios do vendedor, filtra só
 // as categorias de balancim, e faz upsert em products. Uso manual/único —
 // não roda sozinho, o Bruno acessa essa URL quando quiser (re)popular.
@@ -131,6 +136,18 @@ export async function GET() {
       // sem compatibilidade cadastrada ou falha pontual — segue sem marca
     }
 
+    let description: string | null = null
+    try {
+      const descRes = await fetch(`${ML_API}/items/${item.id}/description`, { headers: auth })
+      if (descRes.ok) {
+        const desc = (await descRes.json()) as MlDescription
+        const text = (desc.plain_text || desc.text || '').trim()
+        description = text || null
+      }
+    } catch {
+      // item sem descrição cadastrada — segue sem
+    }
+
     rows.push({
       ml_item_id: item.id,
       title: item.title,
@@ -140,6 +157,7 @@ export async function GET() {
       images: (item.pictures ?? []).map((p) => p.secure_url ?? p.url),
       permalink: item.permalink,
       brand: brandGuess,
+      description,
       ml_attributes: { category_id: item.category_id, attributes: item.attributes ?? null, compatibilities },
       ml_updated_at: item.last_updated,
       synced_at: new Date().toISOString(),
