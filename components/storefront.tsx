@@ -32,13 +32,13 @@ export function Header() {
         </div>
       </form>
       <div className="flex items-center gap-3">
-        <a href="https://wa.me/5500000000000" target="_blank" rel="noreferrer" className="hidden items-center gap-2 text-sm font-medium text-[#111] transition hover:text-[#B58A2E] sm:flex"><MessageCircle aria-hidden="true" className="size-5 text-[#B58A2E]" /> WhatsApp</a>
+        <a href="https://wa.me/5554981319593" target="_blank" rel="noreferrer" className="hidden items-center gap-2 text-sm font-medium text-[#111] transition hover:text-[#B58A2E] sm:flex"><MessageCircle aria-hidden="true" className="size-5 text-[#B58A2E]" /> WhatsApp</a>
         <button type="button" onClick={() => setMenuOpen(!menuOpen)} className="rounded p-2 text-[#111] hover:bg-[#FAF8F3] md:hidden" aria-expanded={menuOpen} aria-label={menuOpen ? 'Fechar menu' : 'Abrir menu'}>{menuOpen ? <X /> : <Menu />}</button>
       </div>
     </div>
     {menuOpen && <div className="border-t border-[#E7E7E5] bg-white p-4 md:hidden">
       <form action="/produtos" className="relative mb-3"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#6B6B6B]" /><input name="q" className="h-11 w-full rounded border border-[#E7E7E5] bg-[#FAF8F3] pl-10 pr-3 text-sm" placeholder="Buscar produtos" /></form>
-      <a href="https://wa.me/5500000000000" target="_blank" rel="noreferrer" className="flex items-center gap-2 py-2 text-sm font-medium"><MessageCircle className="size-5 text-[#B58A2E]" /> Fale pelo WhatsApp</a>
+      <a href="https://wa.me/5554981319593" target="_blank" rel="noreferrer" className="flex items-center gap-2 py-2 text-sm font-medium"><MessageCircle className="size-5 text-[#B58A2E]" /> Fale pelo WhatsApp</a>
     </div>}
   </header>
 }
@@ -48,7 +48,7 @@ export function Footer() {
     <div className="container grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-4">
       <div className="sm:col-span-2 lg:col-span-1"><Logo /><p className="mt-5 max-w-xs text-sm leading-relaxed text-[#6B6B6B]">Peças para quem entende de motor. Especialistas em balancins de válvula para veículos leves e pesados.</p></div>
       <div><h3 className="font-[var(--font-poppins)] text-sm font-semibold text-[#111]">Navegação</h3><nav className="mt-4 flex flex-col gap-3 text-sm text-[#6B6B6B]"><Link href="/produtos" className="hover:text-[#B58A2E]">Todos os produtos</Link><Link href="/produtos?categoria=roletado" className="hover:text-[#B58A2E]">Balancins roletados</Link><Link href="/produtos?categoria=admissao" className="hover:text-[#B58A2E]">Admissão e escape</Link><Link href="/produtos?categoria=conjunto" className="hover:text-[#B58A2E]">Conjuntos</Link></nav></div>
-      <div><h3 className="font-[var(--font-poppins)] text-sm font-semibold text-[#111]">Atendimento</h3><div className="mt-4 flex flex-col gap-3 text-sm text-[#6B6B6B]"><span>Seg a sex, das 8h às 18h</span><a href="https://wa.me/5500000000000" className="hover:text-[#B58A2E]">(00) 00000-0000</a><a href="mailto:contato@casadosbalancim.com.br" className="hover:text-[#B58A2E]">contato@casadosbalancim.com.br</a></div></div>
+      <div><h3 className="font-[var(--font-poppins)] text-sm font-semibold text-[#111]">Atendimento</h3><div className="mt-4 flex flex-col gap-3 text-sm text-[#6B6B6B]"><span>Seg a sex, das 8h às 18h</span><a href="https://wa.me/5554981319593" className="hover:text-[#B58A2E]">(54) 98131-9593</a><a href="mailto:contato@casadosbalancim.com.br" className="hover:text-[#B58A2E]">contato@casadosbalancim.com.br</a></div></div>
       <div><h3 className="font-[var(--font-poppins)] text-sm font-semibold text-[#111]">Siga a gente</h3><a href="https://instagram.com/casadosbalancim" target="_blank" rel="noreferrer" className="mt-4 inline-flex text-sm text-[#6B6B6B] hover:text-[#B58A2E]">@casadosbalancim</a><p className="mt-5 text-xs leading-relaxed text-[#6B6B6B]">Envio para todo o Brasil com segurança e rastreio.</p></div>
     </div>
     <div className="border-t border-[#E7E7E5] py-5"><div className="container flex flex-col gap-2 text-xs text-[#6B6B6B] sm:flex-row sm:items-center sm:justify-between"><span>© 2025 Casa dos Balancim. Todos os direitos reservados.</span><span>Catálogo demonstrativo</span></div></div>
