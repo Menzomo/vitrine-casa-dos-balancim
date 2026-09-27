@@ -7,7 +7,7 @@ import { Search, MessageCircle, ChevronRight, SlidersHorizontal, ArrowUpDown, Ch
 import { Product, Category } from '@/lib/products'
 
 const categoryLabels: Record<Category, string> = {
-  roletado: 'Roletado', admissao: 'Admissão', escape: 'Escape', conjunto: 'Conjunto eixo + balancins',
+  roletado: 'Roletado', admissao: 'Admissão', escape: 'Escape', conjunto: 'Conjunto eixo + balancins', acessorios: 'Acessórios',
 }
 
 export function Logo({ compact = false }: { compact?: boolean }) {
@@ -47,7 +47,7 @@ export function Footer() {
   return <footer className="border-t border-[#E7E7E5] bg-[#FAF8F3]">
     <div className="container grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-4">
       <div className="sm:col-span-2 lg:col-span-1"><Logo /><p className="mt-5 max-w-xs text-sm leading-relaxed text-[#6B6B6B]">Peças para quem entende de motor. Especialistas em balancins de válvula para veículos leves e pesados.</p></div>
-      <div><h3 className="font-[var(--font-poppins)] text-sm font-semibold text-[#111]">Navegação</h3><nav className="mt-4 flex flex-col gap-3 text-sm text-[#6B6B6B]"><Link href="/produtos" className="hover:text-[#B58A2E]">Todos os produtos</Link><Link href="/produtos?categoria=roletado" className="hover:text-[#B58A2E]">Balancins roletados</Link><Link href="/produtos?categoria=admissao" className="hover:text-[#B58A2E]">Admissão e escape</Link><Link href="/produtos?categoria=conjunto" className="hover:text-[#B58A2E]">Conjuntos</Link></nav></div>
+      <div><h3 className="font-[var(--font-poppins)] text-sm font-semibold text-[#111]">Navegação</h3><nav className="mt-4 flex flex-col gap-3 text-sm text-[#6B6B6B]"><Link href="/produtos" className="hover:text-[#B58A2E]">Todos os produtos</Link><Link href="/produtos?categoria=roletado" className="hover:text-[#B58A2E]">Balancins roletados</Link><Link href="/produtos?categoria=admissao" className="hover:text-[#B58A2E]">Admissão e escape</Link><Link href="/produtos?categoria=conjunto" className="hover:text-[#B58A2E]">Conjuntos</Link><Link href="/produtos?categoria=acessorios" className="hover:text-[#B58A2E]">Acessórios</Link></nav></div>
       <div><h3 className="font-[var(--font-poppins)] text-sm font-semibold text-[#111]">Atendimento</h3><div className="mt-4 flex flex-col gap-3 text-sm text-[#6B6B6B]"><span>Atendimento 24h</span><a href="https://wa.me/5554981319593" className="hover:text-[#B58A2E]">(54) 98131-9593</a><a href="mailto:contato@casadosbalancim.com.br" className="hover:text-[#B58A2E]">contato@casadosbalancim.com.br</a></div></div>
       <div><h3 className="font-[var(--font-poppins)] text-sm font-semibold text-[#111]">Siga a gente</h3><a href="https://instagram.com/casadosbalancim" target="_blank" rel="noreferrer" className="mt-4 inline-flex text-sm text-[#6B6B6B] hover:text-[#B58A2E]">@casadosbalancim</a><p className="mt-5 text-xs leading-relaxed text-[#6B6B6B]">Envio para todo o Brasil com segurança e rastreio.</p></div>
     </div>
@@ -55,12 +55,12 @@ export function Footer() {
   </footer>
 }
 
-export function ProductCard({ product }: { product: Product }) {
+export function ProductCard({ product, highlightBestSeller = false }: { product: Product; highlightBestSeller?: boolean }) {
   const productHref = `/produtos/${product.id}`
   return <article className="group flex h-full flex-col overflow-hidden rounded border border-[#E7E7E5] bg-white transition duration-300 hover:-translate-y-1 hover:border-[#D4B05A] hover:shadow-lg hover:shadow-[#B58A2E]/10">
     <Link href={productHref} className="relative block aspect-square overflow-hidden bg-[#FAF8F3]" aria-label={`Ver ${product.title}`}>
       <Image src={product.images[0]} alt="Imagem ilustrativa do produto" fill className="object-contain p-7 transition duration-500 group-hover:scale-105" sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" />
-      {product.stock > 0 && product.stock <= 3 && <span className="absolute left-3 top-3 rounded bg-[#B58A2E] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">Últimas unidades</span>}
+      {highlightBestSeller ? <span className="absolute left-3 top-3 rounded bg-[#111] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">Mais vendido</span> : product.stock > 0 && product.stock <= 3 && <span className="absolute left-3 top-3 rounded bg-[#B58A2E] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">Últimas unidades</span>}
     </Link>
     <div className="flex flex-1 flex-col p-4 sm:p-5"><span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#B58A2E]">{product.category ? categoryLabels[product.category] : 'Balancim'} · {product.brand ?? 'Marca não informada'}</span><Link href={productHref} className="mt-2 line-clamp-3 text-sm font-semibold leading-snug text-[#111] transition hover:text-[#B58A2E] sm:text-[15px]">{product.title}</Link><div className="mt-auto pt-5"><p className="text-lg font-bold text-[#111]">{product.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p><p className="mt-1 text-xs text-[#6B6B6B]">à vista no catálogo</p><a href={`/go/${product.id}`} target="_blank" rel="noopener" className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded bg-[#B58A2E] text-sm font-semibold text-white transition hover:bg-[#8e6b20] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B58A2E] focus-visible:ring-offset-2">Comprar <ChevronRight aria-hidden="true" className="size-4" /></a></div></div>
   </article>

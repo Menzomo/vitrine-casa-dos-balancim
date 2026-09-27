@@ -1,6 +1,6 @@
 import { createPublicClient } from './supabase/public'
 
-export type Category = 'roletado' | 'admissao' | 'escape' | 'conjunto'
+export type Category = 'roletado' | 'admissao' | 'escape' | 'conjunto' | 'acessorios'
 
 export interface Application {
   vehicle: string
@@ -46,6 +46,7 @@ export interface Product {
   // Demais características do anúncio no ML (tipo de balancim, origem,
   // auto-compensador, etc.) — varia de item pra item, mostra só o que existir.
   specs: Spec[]
+  soldQuantity: number
   createdAt: Date
   updatedAt: Date
 }
@@ -66,12 +67,13 @@ type ProductRow = {
   applications: Application[] | null
   description: string | null
   ml_attributes: { attributes?: MlAttribute[] } | null
+  sold_quantity: number
   created_at: string
   updated_at: string
 }
 
 const SELECT_COLUMNS =
-  'ml_item_id, title, price, stock, status, images, permalink, category, brand, engine, applications, description, ml_attributes, created_at, updated_at'
+  'ml_item_id, title, price, stock, status, images, permalink, category, brand, engine, applications, description, ml_attributes, sold_quantity, created_at, updated_at'
 
 function mapSpecs(attributes: MlAttribute[] | undefined): Spec[] {
   if (!attributes) return []
@@ -95,6 +97,7 @@ function mapRow(row: ProductRow): Product {
     applications: row.applications ?? [],
     description: row.description,
     specs: mapSpecs(row.ml_attributes?.attributes),
+    soldQuantity: row.sold_quantity,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   }
@@ -150,7 +153,20 @@ export async function getBrands(): Promise<string[]> {
 }
 
 export function getCategories(): Category[] {
-  return ['roletado', 'admissao', 'escape', 'conjunto']
+  return ['roletado', 'admissao', 'escape', 'conjunto', 'acessorios']
+}
+
+export async function getBestSellers(limit: number = 8): Promise<Product[]> {
+  const supabase = createPublicClient()
+  const { data, error } = await supabase
+    .from('products')
+    .select(SELECT_COLUMNS)
+    .gt('sold_quantity', 0)
+    .order('sold_quantity', { ascending: false })
+    .limit(limit)
+
+  if (error) throw new Error(`Falha ao buscar mais vendidos: ${error.message}`)
+  return (data ?? []).map(mapRow)
 }
 
 export async function getRelatedProducts(productId: string, limit: number = 4): Promise<Product[]> {

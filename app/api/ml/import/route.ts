@@ -2,11 +2,15 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getValidMlToken } from '@/lib/ml/token'
 
-// Categorias do ML que são de fato balancim de válvula (autopeças). O
-// vendedor também tem produtos fora desse escopo (bola de engate, união
-// sanitária) que ficam de fora por enquanto — ver relatório de "ignorados"
-// no fim da carga.
-const ALLOWED_CATEGORY_IDS = new Set(['MLB194177', 'MLB193389', 'MLB237416'])
+// Categorias do ML que são de fato balancim de válvula (autopeças).
+const BALANCIM_CATEGORY_IDS = new Set(['MLB194177', 'MLB193389', 'MLB237416'])
+
+// Outros produtos que o vendedor também anuncia (bola de engate, união
+// sanitária) — fora da especialidade de balancim, mas entram como
+// "Acessórios" porque o cliente pediu destaque (são os que mais vendem).
+const ACCESSORY_CATEGORY_IDS = new Set(['MLB430567', 'MLB3530'])
+
+const ALLOWED_CATEGORY_IDS = new Set([...BALANCIM_CATEGORY_IDS, ...ACCESSORY_CATEGORY_IDS])
 
 // Normaliza a marca extraída do catálogo do ML pro nome que o site usa.
 // "Chevrolet" -> "GM" (GM é a marca já usada no site); variações de
@@ -25,8 +29,9 @@ function normalizeBrand(raw: string | null): string | null {
 // taxonomia nossa. Deriva por palavra-chave no título, no mesmo padrão
 // usado nos 24 produtos fictícios originais: "roletado" é a linha geral
 // (padrão quando o título não especifica admissão/escape/conjunto).
-function guessCategory(title: string): 'roletado' | 'admissao' | 'escape' | 'conjunto' {
-  const t = title.toLowerCase()
+function guessCategory(item: MlItem): 'roletado' | 'admissao' | 'escape' | 'conjunto' | 'acessorios' {
+  if (ACCESSORY_CATEGORY_IDS.has(item.category_id)) return 'acessorios'
+  const t = item.title.toLowerCase()
   const hasAdmissao = t.includes('admiss')
   const hasEscape = t.includes('escape')
   if (t.includes('conjunto') || t.includes('eixo')) return 'conjunto'
@@ -47,6 +52,7 @@ type MlItem = {
   status: string
   category_id: string
   permalink: string
+  sold_quantity: number
   last_updated: string
   pictures?: { url: string; secure_url?: string }[]
   attributes?: unknown
@@ -172,8 +178,9 @@ export async function GET() {
       images: (item.pictures ?? []).map((p) => p.secure_url ?? p.url),
       permalink: item.permalink,
       brand: brandGuess,
-      category: guessCategory(item.title),
+      category: guessCategory(item),
       description,
+      sold_quantity: item.sold_quantity ?? 0,
       ml_attributes: { category_id: item.category_id, attributes: item.attributes ?? null, compatibilities },
       ml_updated_at: item.last_updated,
       synced_at: new Date().toISOString(),
