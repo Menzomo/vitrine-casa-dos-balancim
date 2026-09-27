@@ -38,7 +38,14 @@ export function Header() {
     </div>
     {menuOpen && <div className="border-t border-[#E7E7E5] bg-white p-4 md:hidden">
       <form action="/produtos" className="relative mb-3"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#6B6B6B]" /><input name="q" className="h-11 w-full rounded border border-[#E7E7E5] bg-[#FAF8F3] pl-10 pr-3 text-sm" placeholder="Buscar produtos" /></form>
-      <a href="https://wa.me/5554981319593" target="_blank" rel="noreferrer" className="flex items-center gap-2 py-2 text-sm font-medium"><MessageCircle className="size-5 text-[#B58A2E]" /> Fale pelo WhatsApp</a>
+      <nav className="flex flex-col divide-y divide-[#E7E7E5] border-y border-[#E7E7E5]">
+        <Link href="/produtos" className="py-3 text-sm font-medium text-[#111]">Todos os produtos</Link>
+        <Link href="/produtos?categoria=roletado" className="py-3 text-sm font-medium text-[#111]">Balancins roletados</Link>
+        <Link href="/produtos?categoria=admissao" className="py-3 text-sm font-medium text-[#111]">Admissão e escape</Link>
+        <Link href="/produtos?categoria=conjunto" className="py-3 text-sm font-medium text-[#111]">Conjuntos</Link>
+        <Link href="/produtos?categoria=acessorios" className="py-3 text-sm font-medium text-[#111]">Acessórios</Link>
+      </nav>
+      <a href="https://wa.me/5554981319593" target="_blank" rel="noreferrer" className="mt-3 flex items-center gap-2 py-2 text-sm font-medium"><MessageCircle className="size-5 text-[#B58A2E]" /> Fale pelo WhatsApp</a>
     </div>}
   </header>
 }
