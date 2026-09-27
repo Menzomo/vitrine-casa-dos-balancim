@@ -20,7 +20,7 @@ export function ProductsCatalog({ initialProducts, brands, initialSearch, initia
     if (sort === 'menor') result = [...result].sort((a, b) => a.price - b.price)
     if (sort === 'maior') result = [...result].sort((a, b) => b.price - a.price)
     return result
-  }, [products, inStock, sort])
+  }, [products, brand, category, inStock, sort])
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()
