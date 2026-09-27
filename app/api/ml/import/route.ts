@@ -21,6 +21,21 @@ function normalizeBrand(raw: string | null): string | null {
   return BRAND_ALIASES[raw.toLowerCase()] ?? raw
 }
 
+// Categoria (roletado/admissao/escape/conjunto) não existe no ML — é
+// taxonomia nossa. Deriva por palavra-chave no título, no mesmo padrão
+// usado nos 24 produtos fictícios originais: "roletado" é a linha geral
+// (padrão quando o título não especifica admissão/escape/conjunto).
+function guessCategory(title: string): 'roletado' | 'admissao' | 'escape' | 'conjunto' {
+  const t = title.toLowerCase()
+  const hasAdmissao = t.includes('admiss')
+  const hasEscape = t.includes('escape')
+  if (t.includes('conjunto') || t.includes('eixo')) return 'conjunto'
+  if (hasAdmissao && hasEscape) return 'conjunto'
+  if (hasAdmissao) return 'admissao'
+  if (hasEscape) return 'escape'
+  return 'roletado'
+}
+
 const ML_API = 'https://api.mercadolibre.com'
 const UA = { 'User-Agent': 'CasaDosBalancim-Integracao/1.0' }
 
@@ -157,6 +172,7 @@ export async function GET() {
       images: (item.pictures ?? []).map((p) => p.secure_url ?? p.url),
       permalink: item.permalink,
       brand: brandGuess,
+      category: guessCategory(item.title),
       description,
       ml_attributes: { category_id: item.category_id, attributes: item.attributes ?? null, compatibilities },
       ml_updated_at: item.last_updated,
