@@ -1,77 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getValidMlToken } from '@/lib/ml/token'
-
-// Categorias do ML que são de fato balancim de válvula (autopeças).
-const BALANCIM_CATEGORY_IDS = new Set(['MLB194177', 'MLB193389', 'MLB237416'])
-
-// Outros produtos que o vendedor também anuncia (bola de engate, união
-// sanitária) — fora da especialidade de balancim, mas entram como
-// "Acessórios" porque o cliente pediu destaque (são os que mais vendem).
-const ACCESSORY_CATEGORY_IDS = new Set(['MLB430567', 'MLB3530'])
-
-const ALLOWED_CATEGORY_IDS = new Set([...BALANCIM_CATEGORY_IDS, ...ACCESSORY_CATEGORY_IDS])
-
-// Normaliza a marca extraída do catálogo do ML pro nome que o site usa.
-// "Chevrolet" -> "GM" (GM é a marca já usada no site); variações de
-// grafia (ex: "Mercedes-benz") viram a forma canônica.
-const BRAND_ALIASES: Record<string, string> = {
-  chevrolet: 'GM',
-  'mercedes-benz': 'Mercedes-Benz',
-}
-
-function normalizeBrand(raw: string | null): string | null {
-  if (!raw) return null
-  return BRAND_ALIASES[raw.toLowerCase()] ?? raw
-}
-
-// Categoria (roletado/admissao/escape/conjunto) não existe no ML — é
-// taxonomia nossa. Deriva por palavra-chave no título, no mesmo padrão
-// usado nos 24 produtos fictícios originais: "roletado" é a linha geral
-// (padrão quando o título não especifica admissão/escape/conjunto).
-function guessCategory(item: MlItem): 'roletado' | 'admissao' | 'escape' | 'conjunto' | 'acessorios' {
-  if (ACCESSORY_CATEGORY_IDS.has(item.category_id)) return 'acessorios'
-  const t = item.title.toLowerCase()
-  const hasAdmissao = t.includes('admiss')
-  const hasEscape = t.includes('escape')
-  if (t.includes('conjunto') || t.includes('eixo')) return 'conjunto'
-  if (hasAdmissao && hasEscape) return 'conjunto'
-  if (hasAdmissao) return 'admissao'
-  if (hasEscape) return 'escape'
-  return 'roletado'
-}
-
-const ML_API = 'https://api.mercadolibre.com'
-const UA = { 'User-Agent': 'CasaDosBalancim-Integracao/1.0' }
-
-type MlItem = {
-  id: string
-  title: string
-  price: number
-  available_quantity: number
-  status: string
-  category_id: string
-  permalink: string
-  sold_quantity: number
-  last_updated: string
-  pictures?: { url: string; secure_url?: string }[]
-  attributes?: unknown
-}
-
-type MlBulkResult = { id: string; status_code: number; body: MlItem }
-
-type MlCompatibility = {
-  products?: { catalog_product_name: string }[]
-}
-
-type MlDescription = {
-  text?: string
-  plain_text?: string
-}
+import { ALLOWED_CATEGORY_IDS, UA, buildProductRow, fetchAllSellerItemIds, fetchItemsBulk, logSync } from '@/lib/ml/sync'
 
 // Carga inicial (etapa 4): busca todos os anúncios do vendedor, filtra só
-// as categorias de balancim, e faz upsert em products. Uso manual/único —
-// não roda sozinho, o Bruno acessa essa URL quando quiser (re)popular.
+// as categorias de balancim/acessórios, e faz upsert em products. Uso
+// manual — o Bruno acessa essa URL quando quiser (re)popular tudo de uma
+// vez; a partir da etapa 7, produto a produto é mantido pelo webhook +
+// cron de reconciliação.
 export async function GET() {
   const supabase = createAdminClient()
 
@@ -87,50 +23,20 @@ export async function GET() {
   const accessToken = await getValidMlToken()
   const auth = { Authorization: `Bearer ${accessToken}`, ...UA }
 
-  // 1. Paginar todos os IDs de anúncio do vendedor.
-  const itemIds: string[] = []
-  let offset = 0
-  const limit = 100
-  while (true) {
-    const searchRes = await fetch(
-      `${ML_API}/users/${cred.seller_id}/items/search?limit=${limit}&offset=${offset}`,
-      { headers: auth }
-    )
-    if (!searchRes.ok) {
-      return report(`Falha ao listar anúncios (status ${searchRes.status}): ${await searchRes.text()}`, null)
-    }
-    const search = (await searchRes.json()) as { results: string[]; paging: { total: number } }
-    itemIds.push(...search.results)
-    offset += limit
-    if (offset >= search.paging.total || search.results.length === 0) break
-  }
+  const itemIds = await fetchAllSellerItemIds(auth, cred.seller_id)
+  const { items, failedIds } = await fetchItemsBulk(auth, itemIds)
+  await logSync(
+    supabase,
+    'initial',
+    failedIds.map((id) => ({ ml_item_id: id, result: 'error', error: 'falha ao buscar detalhes do item' }))
+  )
 
-  // 2. Buscar detalhes em lotes de 20 via /items/bulk (substituto do
-  // /items?ids= antigo, que está em descontinuação).
-  const items: MlItem[] = []
-  for (let i = 0; i < itemIds.length; i += 20) {
-    const chunk = itemIds.slice(i, i + 20)
-    const bulkRes = await fetch(`${ML_API}/items/bulk?ids=${chunk.join(',')}`, { headers: auth })
-    if (!bulkRes.ok) {
-      await logSync(supabase, chunk.map((id) => ({ ml_item_id: id, result: 'error', error: `bulk fetch falhou: ${bulkRes.status}` })))
-      continue
-    }
-    const bulk = (await bulkRes.json()) as MlBulkResult[]
-    for (const entry of bulk) {
-      if (entry.status_code === 200) {
-        items.push(entry.body)
-      } else {
-        await logSync(supabase, [{ ml_item_id: entry.id, result: 'error', error: `status_code ${entry.status_code}` }])
-      }
-    }
-  }
-
-  // 3. Separar o que está dentro do escopo (categorias de balancim) do que não está.
   const included = items.filter((item) => ALLOWED_CATEGORY_IDS.has(item.category_id))
   const skipped = items.filter((item) => !ALLOWED_CATEGORY_IDS.has(item.category_id))
 
   await logSync(
     supabase,
+    'initial',
     skipped.map((item) => ({
       ml_item_id: item.id,
       result: 'skipped',
@@ -138,53 +44,10 @@ export async function GET() {
     }))
   )
 
-  // 4. Pra cada item incluído, buscar compatibilidades (marca/modelo do
-  // veículo) e montar a linha de products.
   const rows = []
   const syncEntries = []
   for (const item of included) {
-    let brandGuess: string | null = null
-    let compatibilities: MlCompatibility['products'] = []
-    try {
-      const compatRes = await fetch(`${ML_API}/items/${item.id}/compatibilities`, { headers: auth })
-      if (compatRes.ok) {
-        const compat = (await compatRes.json()) as MlCompatibility
-        compatibilities = compat.products ?? []
-        const firstName = compatibilities[0]?.catalog_product_name
-        brandGuess = normalizeBrand(firstName ? firstName.split(' ')[0] : null)
-      }
-    } catch {
-      // sem compatibilidade cadastrada ou falha pontual — segue sem marca
-    }
-
-    let description: string | null = null
-    try {
-      const descRes = await fetch(`${ML_API}/items/${item.id}/description`, { headers: auth })
-      if (descRes.ok) {
-        const desc = (await descRes.json()) as MlDescription
-        const text = (desc.plain_text || desc.text || '').trim()
-        description = text || null
-      }
-    } catch {
-      // item sem descrição cadastrada — segue sem
-    }
-
-    rows.push({
-      ml_item_id: item.id,
-      title: item.title,
-      price: item.price,
-      stock: item.available_quantity,
-      status: item.status,
-      images: (item.pictures ?? []).map((p) => p.secure_url ?? p.url),
-      permalink: item.permalink,
-      brand: brandGuess,
-      category: guessCategory(item),
-      description,
-      sold_quantity: item.sold_quantity ?? 0,
-      ml_attributes: { category_id: item.category_id, attributes: item.attributes ?? null, compatibilities },
-      ml_updated_at: item.last_updated,
-      synced_at: new Date().toISOString(),
-    })
+    rows.push(await buildProductRow(auth, item))
     syncEntries.push({ ml_item_id: item.id, result: 'success' as const, error: null })
   }
 
@@ -194,9 +57,9 @@ export async function GET() {
       return report(`Falha ao salvar produtos: ${upsertError.message}`, null)
     }
   }
-  await logSync(supabase, syncEntries)
+  await logSync(supabase, 'initial', syncEntries)
 
-  // 5. Relatório: produtos ativos por marca (só o que foi importado agora).
+  // Relatório: produtos ativos por marca (só o que foi importado agora).
   const activeByBrand = new Map<string, number>()
   for (const row of rows) {
     if (row.status !== 'active') continue
@@ -210,14 +73,6 @@ export async function GET() {
     ignorados: skipped.map((s) => ({ id: s.id, title: s.title, category_id: s.category_id })),
     ativosPorMarca: Object.fromEntries([...activeByBrand.entries()].sort((a, b) => b[1] - a[1])),
   })
-}
-
-async function logSync(
-  supabase: ReturnType<typeof createAdminClient>,
-  entries: { ml_item_id: string; result: 'success' | 'error' | 'skipped'; error: string | null }[]
-) {
-  if (entries.length === 0) return
-  await supabase.from('sync_log').insert(entries.map((e) => ({ ...e, source: 'initial' as const })))
 }
 
 function report(error: string | null, data: unknown) {
