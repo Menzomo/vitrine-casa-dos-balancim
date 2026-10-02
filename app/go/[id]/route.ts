@@ -1,9 +1,7 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-
-const SESSION_COOKIE = 'cb_sid'
-const SESSION_MAX_AGE = 60 * 60 * 24 * 180 // 180 dias
+import { getOrCreateSessionId } from '@/lib/analytics/session'
 
 // Redirect rastreado do botão Comprar: grava o clique em site_events
 // (via service role, já que anon não tem permissão de escrever ali) e só
@@ -30,17 +28,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const cookieStore = await cookies()
-  let sessionId = cookieStore.get(SESSION_COOKIE)?.value
-  if (!sessionId) {
-    sessionId = crypto.randomUUID()
-    cookieStore.set(SESSION_COOKIE, sessionId, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      maxAge: SESSION_MAX_AGE,
-      path: '/',
-    })
-  }
+  const sessionId = await getOrCreateSessionId(cookieStore)
 
   const url = new URL(request.url)
   const { error: insertError } = await supabase.from('site_events').insert({
