@@ -8,9 +8,10 @@ import { createClient } from '@/lib/supabase/client'
 // rota de servidor: o Supabase pode devolver a sessão de duas formas —
 // ?code=... (troca via exchangeCodeForSession) ou #access_token=...
 // (fragmento da URL, que o navegador NUNCA envia pro servidor — só dá
-// pra ler com JS no cliente). O client do @supabase/ssr já detecta e
-// grava a sessão nos cookies sozinho nesse segundo caso
-// (detectSessionInUrl, padrão); só precisamos confirmar que funcionou.
+// pra ler com JS no cliente). Setamos a sessão explicitamente com
+// setSession() em vez de confiar na autodetecção (detectSessionInUrl):
+// essa autodetecção roda de forma assíncrona na inicialização do client
+// e numa corrida com um getSession() logo em seguida, às vezes perde.
 export default function AuthCallbackPage() {
   const router = useRouter()
   const [error, setError] = useState('')
@@ -27,15 +28,20 @@ export default function AuthCallbackPage() {
           setError(error.message)
           return
         }
-      } else if (window.location.hash.includes('access_token')) {
-        const { data } = await supabase.auth.getSession()
-        if (!data.session) {
-          setError('Não foi possível confirmar o login.')
+      } else {
+        const hashParams = new URLSearchParams(window.location.hash.slice(1))
+        const accessToken = hashParams.get('access_token')
+        const refreshToken = hashParams.get('refresh_token')
+        if (accessToken && refreshToken) {
+          const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+          if (error) {
+            setError(error.message)
+            return
+          }
+        } else {
+          setError('Link de acesso inválido ou expirado. Peça um novo link em /admin/login.')
           return
         }
-      } else {
-        setError('Link de acesso inválido ou expirado. Peça um novo link em /admin/login.')
-        return
       }
 
       router.replace('/admin')
