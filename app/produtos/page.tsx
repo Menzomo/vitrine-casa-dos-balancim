@@ -3,7 +3,11 @@ import { getBrands, getProducts } from '@/lib/products'
 import { getSettings } from '@/lib/settings'
 import { ProductsCatalog } from './products-catalog'
 
-export const metadata: Metadata = { title: 'Catálogo de Balancins | Casa dos Balancim', description: 'Encontre balancins de válvula por montadora, tipo, aplicação ou motor.' }
+export const metadata: Metadata = {
+  title: 'Catálogo de Balancins',
+  description: 'Encontre balancins de válvula por montadora, tipo, aplicação ou motor.',
+  alternates: { canonical: '/produtos' },
+}
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ q?: string; montadora?: string; categoria?: string }> }) {
   const params = await searchParams
