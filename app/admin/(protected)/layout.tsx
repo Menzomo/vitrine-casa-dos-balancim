@@ -1,6 +1,14 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { SignOutButton } from './sign-out-button'
+
+const NAV_LINKS = [
+  { href: '/admin', label: 'Métricas' },
+  { href: '/admin/produtos', label: 'Produtos' },
+  { href: '/admin/banners', label: 'Banners' },
+  { href: '/admin/configuracoes', label: 'Textos' },
+]
 
 // Trava de acesso do painel: precisa estar logado E cadastrado em
 // admin_users (checado via RPC is_admin(), já que a tabela em si não tem
@@ -20,8 +28,15 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
   return (
     <div className="min-h-screen bg-[#FAF8F3]">
       <header className="border-b border-[#E7E7E5] bg-white">
-        <div className="container flex h-16 items-center justify-between">
+        <div className="container flex h-16 flex-wrap items-center justify-between gap-4">
           <span className="font-[var(--font-poppins)] font-bold text-[#111]">Painel Casa dos Balancim</span>
+          <nav className="flex items-center gap-5 text-sm font-medium text-[#6B6B6B]">
+            {NAV_LINKS.map((link) => (
+              <Link key={link.href} href={link.href} className="hover:text-[#B58A2E]">
+                {link.label}
+              </Link>
+            ))}
+          </nav>
           <SignOutButton />
         </div>
       </header>

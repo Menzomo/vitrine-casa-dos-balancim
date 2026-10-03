@@ -169,6 +169,28 @@ export async function getBestSellers(limit: number = 8): Promise<Product[]> {
   return (data ?? []).map(mapRow)
 }
 
+// Produtos marcados em destaque pelo /admin, na ordem definida lá
+// (featured_products.position). Se um produto deixa de ser visível
+// (oculto/pausado/sem estoque), a RLS de products já o tira do join —
+// filtramos o null resultante.
+export async function getFeaturedProducts(): Promise<Product[]> {
+  const supabase = createPublicClient()
+  const { data, error } = await supabase
+    .from('featured_products')
+    .select(`position, products (${SELECT_COLUMNS})`)
+    .order('position', { ascending: true })
+
+  if (error) {
+    console.error('Falha ao buscar produtos em destaque:', error.message)
+    return []
+  }
+
+  return (data ?? [])
+    .map((row) => row.products as unknown as ProductRow | null)
+    .filter((p): p is ProductRow => p !== null)
+    .map(mapRow)
+}
+
 export async function getRelatedProducts(productId: string, limit: number = 4): Promise<Product[]> {
   const product = await getProductById(productId)
   if (!product || !product.brand) return []
