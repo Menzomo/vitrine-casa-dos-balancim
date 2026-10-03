@@ -6,7 +6,6 @@ import { SignOutButton } from './sign-out-button'
 const NAV_LINKS = [
   { href: '/admin', label: 'Métricas' },
   { href: '/admin/produtos', label: 'Produtos' },
-  { href: '/admin/banners', label: 'Banners' },
   { href: '/admin/configuracoes', label: 'Textos' },
 ]
 
