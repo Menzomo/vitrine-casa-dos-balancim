@@ -37,15 +37,15 @@ export default async function AdminProductsPage() {
         </p>
       </div>
 
-      <div className="overflow-hidden rounded border border-[#E7E7E5] bg-white">
-        <table className="w-full text-left text-sm">
+      <div className="overflow-x-auto rounded border border-[#E7E7E5] bg-white">
+        <table className="w-full min-w-180 text-left text-sm">
           <thead className="bg-[#FAF8F3] text-xs font-semibold uppercase tracking-wide text-[#6B6B6B]">
             <tr>
-              <th className="px-4 py-3">Produto</th>
-              <th className="px-4 py-3">Status ML</th>
-              <th className="px-4 py-3">Estoque</th>
-              <th className="px-4 py-3">Visível na vitrine</th>
-              <th className="px-4 py-3">Destaque</th>
+              <th className="whitespace-nowrap px-4 py-3">Produto</th>
+              <th className="whitespace-nowrap px-4 py-3">Status ML</th>
+              <th className="whitespace-nowrap px-4 py-3">Estoque</th>
+              <th className="whitespace-nowrap px-4 py-3">Visível na vitrine</th>
+              <th className="whitespace-nowrap px-4 py-3">Destaque</th>
             </tr>
           </thead>
           <tbody>
