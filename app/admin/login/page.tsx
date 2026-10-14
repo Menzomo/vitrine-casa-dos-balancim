@@ -1,12 +1,23 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState('')
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
   const [error, setError] = useState('')
+
+  // Erro vindo do /api/auth/exchange (ex: link expirado/já usado) —
+  // chega como query string depois de um redirect de servidor.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const err = params.get('error')
+    if (err) {
+      setError(err)
+      setStatus('error')
+    }
+  }, [])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
