@@ -1,26 +1,122 @@
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 
-type VisitsByDay = { day: string; visits: number }
-type ProductCount = { ml_item_id: string; title: string; views?: number; clicks?: number }
-type TrafficSource = { origem: string; eventos: number }
+type ProductRef = { ml_item_id: string; title: string } | { ml_item_id: string; title: string }[] | null
 
-export default async function AdminDashboard() {
+type PageviewRow = { created_at: string; session_id: string; referrer: string | null; utm_source: string | null }
+type ProductEventRow = { products: ProductRef }
+
+function toISODate(d: Date) {
+  return d.toISOString().slice(0, 10)
+}
+
+function startOfMonth(d: Date) {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1))
+}
+
+function rangeForPreset(preset: string, today: Date): { from: string; to: string } {
+  const to = toISODate(today)
+  if (preset === 'mes-passado') {
+    const firstThisMonth = startOfMonth(today)
+    const lastDayPrevMonth = new Date(firstThisMonth.getTime() - 86400000)
+    const firstPrevMonth = startOfMonth(lastDayPrevMonth)
+    return { from: toISODate(firstPrevMonth), to: toISODate(lastDayPrevMonth) }
+  }
+  if (preset === 'ultimos-30') {
+    const from = new Date(today.getTime() - 29 * 86400000)
+    return { from: toISODate(from), to }
+  }
+  if (preset === 'tudo') {
+    return { from: '2026-01-01', to }
+  }
+  // 'este-mes' (padrão)
+  return { from: toISODate(startOfMonth(today)), to }
+}
+
+function originFromEvent(referrer: string | null, utmSource: string | null) {
+  if (utmSource) return utmSource
+  if (!referrer) return 'direto'
+  const r = referrer.toLowerCase()
+  if (r.includes('instagram')) return 'instagram'
+  if (r.includes('google')) return 'google'
+  if (r.includes('facebook') || r.includes('fb.')) return 'facebook'
+  if (r.includes('whatsapp') || r.includes('wa.me')) return 'whatsapp'
+  return 'outro site'
+}
+
+export default async function AdminDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string; to?: string; preset?: string }>
+}) {
+  const params = await searchParams
+  const today = new Date()
+
+  const { from, to } = params.from && params.to ? { from: params.from, to: params.to } : rangeForPreset(params.preset ?? 'este-mes', today)
+
+  const fromTimestamp = `${from}T00:00:00.000Z`
+  const toTimestamp = `${to}T23:59:59.999Z`
+
   const supabase = await createClient()
 
-  const [visitsRes, topViewedRes, topClicksRes, sourcesRes] = await Promise.all([
-    supabase.from('v_visits_by_day').select('*').limit(30),
-    supabase.from('v_top_viewed_products').select('*').limit(10),
-    supabase.from('v_buy_clicks_by_product').select('*').limit(10),
-    supabase.from('v_traffic_sources').select('*'),
+  const [pageviewsRes, productViewsRes, buyClicksRes] = await Promise.all([
+    supabase
+      .from('site_events')
+      .select('created_at, session_id, referrer, utm_source')
+      .eq('type', 'pageview')
+      .gte('created_at', fromTimestamp)
+      .lte('created_at', toTimestamp),
+    supabase
+      .from('site_events')
+      .select('products(ml_item_id, title)')
+      .eq('type', 'product_view')
+      .gte('created_at', fromTimestamp)
+      .lte('created_at', toTimestamp),
+    supabase
+      .from('site_events')
+      .select('products(ml_item_id, title)')
+      .eq('type', 'buy_click')
+      .gte('created_at', fromTimestamp)
+      .lte('created_at', toTimestamp),
   ])
 
-  const visits = (visitsRes.data ?? []) as VisitsByDay[]
-  const topViewed = (topViewedRes.data ?? []) as ProductCount[]
-  const topClicks = (topClicksRes.data ?? []) as ProductCount[]
-  const sources = (sourcesRes.data ?? []) as TrafficSource[]
+  const pageviews = (pageviewsRes.data ?? []) as PageviewRow[]
+  const productViewEvents = (productViewsRes.data ?? []) as ProductEventRow[]
+  const buyClickEvents = (buyClicksRes.data ?? []) as ProductEventRow[]
 
-  const totalVisits = visits.reduce((sum, v) => sum + v.visits, 0)
-  const totalClicks = topClicks.reduce((sum, c) => sum + (c.clicks ?? 0), 0)
+  const totalVisits = pageviews.length
+  const uniqueVisitors = new Set(pageviews.map((p) => p.session_id)).size
+
+  const visitsByDayMap = new Map<string, number>()
+  for (const p of pageviews) {
+    const day = p.created_at.slice(0, 10)
+    visitsByDayMap.set(day, (visitsByDayMap.get(day) ?? 0) + 1)
+  }
+  const visitsByDay = [...visitsByDayMap.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1))
+
+  const sourcesMap = new Map<string, number>()
+  for (const p of pageviews) {
+    const origem = originFromEvent(p.referrer, p.utm_source)
+    sourcesMap.set(origem, (sourcesMap.get(origem) ?? 0) + 1)
+  }
+  const sources = [...sourcesMap.entries()].sort((a, b) => b[1] - a[1])
+
+  function groupByProduct(events: ProductEventRow[]) {
+    const map = new Map<string, { title: string; count: number }>()
+    for (const e of events) {
+      const product = Array.isArray(e.products) ? e.products[0] : e.products
+      if (!product) continue
+      const current = map.get(product.ml_item_id)
+      map.set(product.ml_item_id, { title: product.title, count: (current?.count ?? 0) + 1 })
+    }
+    return [...map.entries()].map(([ml_item_id, v]) => ({ ml_item_id, ...v })).sort((a, b) => b.count - a.count)
+  }
+
+  const topViewed = groupByProduct(productViewEvents).slice(0, 10)
+  const topClicks = groupByProduct(buyClickEvents).slice(0, 10)
+  const totalClicks = buyClickEvents.length
+
+  const activePreset = !params.from && !params.to ? (params.preset ?? 'este-mes') : null
 
   return (
     <div className="flex flex-col gap-10">
@@ -32,8 +128,56 @@ export default async function AdminDashboard() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Visitas (últimos 30 dias)" value={totalVisits} />
+      <section className="flex flex-wrap items-end gap-4 rounded border border-[#E7E7E5] bg-white p-4">
+        <div className="flex flex-wrap gap-2">
+          {[
+            { key: 'este-mes', label: 'Este mês' },
+            { key: 'mes-passado', label: 'Mês passado' },
+            { key: 'ultimos-30', label: 'Últimos 30 dias' },
+            { key: 'tudo', label: 'Tudo' },
+          ].map((p) => (
+            <Link
+              key={p.key}
+              href={`/admin?preset=${p.key}`}
+              className={`rounded px-3 py-1.5 text-xs font-semibold ${
+                activePreset === p.key ? 'bg-[#B58A2E] text-white' : 'bg-[#FAF8F3] text-[#6B6B6B] hover:bg-[#D4B05A]/20'
+              }`}
+            >
+              {p.label}
+            </Link>
+          ))}
+        </div>
+        <form action="/admin" method="get" className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="block text-xs font-medium text-[#6B6B6B]">De</label>
+            <input
+              type="date"
+              name="from"
+              defaultValue={from}
+              className="mt-1 h-10 rounded border border-[#E7E7E5] px-3 text-sm outline-none focus:border-[#B58A2E]"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-[#6B6B6B]">Até</label>
+            <input
+              type="date"
+              name="to"
+              defaultValue={to}
+              className="mt-1 h-10 rounded border border-[#E7E7E5] px-3 text-sm outline-none focus:border-[#B58A2E]"
+            />
+          </div>
+          <button type="submit" className="h-10 rounded bg-[#111] px-4 text-sm font-semibold text-white hover:bg-[#B58A2E]">
+            Filtrar
+          </button>
+        </form>
+        <p className="w-full text-xs text-[#6B6B6B]">
+          Período: {new Date(from).toLocaleDateString('pt-BR')} até {new Date(to).toLocaleDateString('pt-BR')}
+        </p>
+      </section>
+
+      <div className="grid gap-4 sm:grid-cols-4">
+        <StatCard label="Visitas no período" value={totalVisits} />
+        <StatCard label="Visitantes únicos" value={uniqueVisitors} />
         <StatCard label="Produtos com visualização" value={topViewed.length} />
         <StatCard label="Cliques em Comprar" value={totalClicks} />
       </div>
@@ -41,32 +185,32 @@ export default async function AdminDashboard() {
       <Section title="Visitas por dia">
         <Table
           headers={['Dia', 'Visitas']}
-          rows={visits.map((v) => [new Date(v.day).toLocaleDateString('pt-BR'), String(v.visits)])}
-          empty="Sem visitas registradas ainda."
+          rows={visitsByDay.map(([day, count]) => [new Date(`${day}T00:00:00`).toLocaleDateString('pt-BR'), String(count)])}
+          empty="Sem visitas registradas nesse período."
         />
       </Section>
 
       <Section title="Produtos mais vistos">
         <Table
           headers={['Produto', 'Visualizações']}
-          rows={topViewed.map((p) => [p.title, String(p.views ?? 0)])}
-          empty="Sem visualizações registradas ainda."
+          rows={topViewed.map((p) => [p.title, String(p.count)])}
+          empty="Sem visualizações registradas nesse período."
         />
       </Section>
 
       <Section title='Cliques em "Comprar" por produto'>
         <Table
           headers={['Produto', 'Cliques']}
-          rows={topClicks.map((p) => [p.title, String(p.clicks ?? 0)])}
-          empty="Sem cliques registrados ainda."
+          rows={topClicks.map((p) => [p.title, String(p.count)])}
+          empty="Sem cliques registrados nesse período."
         />
       </Section>
 
       <Section title="Origem do tráfego">
         <Table
           headers={['Origem', 'Visitas']}
-          rows={sources.map((s) => [s.origem, String(s.eventos)])}
-          empty="Sem dados de origem ainda."
+          rows={sources.map(([origem, count]) => [origem, String(count)])}
+          empty="Sem dados de origem nesse período."
         />
       </Section>
     </div>
