@@ -6,36 +6,75 @@ type ProductRef = { ml_item_id: string; title: string } | { ml_item_id: string; 
 type PageviewRow = { created_at: string; session_id: string; referrer: string | null; utm_source: string | null }
 type ProductEventRow = { products: ProductRef }
 
-function toISODate(d: Date) {
+// Brasil não observa horário de verão desde 2019 — UTC-3 fixo, sem
+// precisar de lógica de fuso dinâmica. Todo o cálculo de "dia" nessa
+// página usa isso, pra não bater meia-noite em UTC e já contar como
+// amanhã (o que antes acontecia a partir das 21h em Brasília).
+const BR_TZ = 'America/Sao_Paulo'
+
+function brTodayString() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: BR_TZ })
+}
+
+function brDateFromTimestamp(iso: string) {
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: BR_TZ })
+}
+
+function formatBrDate(dateStr: string) {
+  const [y, m, d] = dateStr.split('-')
+  return `${d}/${m}/${y}`
+}
+
+function addDaysStr(dateStr: string, days: number) {
+  const d = new Date(`${dateStr}T12:00:00.000Z`) // meio-dia UTC evita virar de dia por arredondamento
+  d.setUTCDate(d.getUTCDate() + days)
   return d.toISOString().slice(0, 10)
 }
 
-function startOfMonth(d: Date) {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1))
+function startOfMonthStr(dateStr: string) {
+  return `${dateStr.slice(0, 7)}-01`
 }
 
-function rangeForPreset(preset: string, today: Date): { from: string; to: string } {
-  const to = toISODate(today)
+// Converte um dia (YYYY-MM-DD, calendário de Brasília) pro intervalo
+// UTC correspondente, pra filtrar site_events.created_at (timestamptz).
+function brStartOfDayUTC(dateStr: string) {
+  return `${dateStr}T03:00:00.000Z`
+}
+function brEndOfDayUTC(dateStr: string) {
+  return `${addDaysStr(dateStr, 1)}T02:59:59.999Z`
+}
+
+function rangeForPreset(preset: string, today: string): { from: string; to: string } {
   if (preset === 'mes-passado') {
-    const firstThisMonth = startOfMonth(today)
-    const lastDayPrevMonth = new Date(firstThisMonth.getTime() - 86400000)
-    const firstPrevMonth = startOfMonth(lastDayPrevMonth)
-    return { from: toISODate(firstPrevMonth), to: toISODate(lastDayPrevMonth) }
+    const firstThisMonth = startOfMonthStr(today)
+    const lastDayPrevMonth = addDaysStr(firstThisMonth, -1)
+    const firstPrevMonth = startOfMonthStr(lastDayPrevMonth)
+    return { from: firstPrevMonth, to: lastDayPrevMonth }
   }
   if (preset === 'ultimos-30') {
-    const from = new Date(today.getTime() - 29 * 86400000)
-    return { from: toISODate(from), to }
+    return { from: addDaysStr(today, -29), to: today }
   }
   if (preset === 'tudo') {
-    return { from: '2026-01-01', to }
+    return { from: '2026-01-01', to: today }
   }
   // 'este-mes' (padrão)
-  return { from: toISODate(startOfMonth(today)), to }
+  return { from: startOfMonthStr(today), to: today }
 }
+
+const SITE_HOSTNAMES = ['casadosbalancim.com.br', 'www.casadosbalancim.com.br']
 
 function originFromEvent(referrer: string | null, utmSource: string | null) {
   if (utmSource) return utmSource
   if (!referrer) return 'direto'
+  try {
+    const host = new URL(referrer).hostname.toLowerCase()
+    // Navegação dentro do próprio site (ex: recarregou uma página
+    // interna) não é um "canal de origem" de verdade — conta como
+    // direto, não como "outro site".
+    if (SITE_HOSTNAMES.includes(host) || host.endsWith('.vercel.app')) return 'direto'
+  } catch {
+    // referrer não é uma URL válida — ignora e segue pro match de texto
+  }
   const r = referrer.toLowerCase()
   if (r.includes('instagram')) return 'instagram'
   if (r.includes('google')) return 'google'
@@ -50,12 +89,12 @@ export default async function AdminDashboard({
   searchParams: Promise<{ from?: string; to?: string; preset?: string }>
 }) {
   const params = await searchParams
-  const today = new Date()
+  const today = brTodayString()
 
   const { from, to } = params.from && params.to ? { from: params.from, to: params.to } : rangeForPreset(params.preset ?? 'este-mes', today)
 
-  const fromTimestamp = `${from}T00:00:00.000Z`
-  const toTimestamp = `${to}T23:59:59.999Z`
+  const fromTimestamp = brStartOfDayUTC(from)
+  const toTimestamp = brEndOfDayUTC(to)
 
   const supabase = await createClient()
 
@@ -89,7 +128,7 @@ export default async function AdminDashboard({
 
   const visitsByDayMap = new Map<string, number>()
   for (const p of pageviews) {
-    const day = p.created_at.slice(0, 10)
+    const day = brDateFromTimestamp(p.created_at)
     visitsByDayMap.set(day, (visitsByDayMap.get(day) ?? 0) + 1)
   }
   const visitsByDay = [...visitsByDayMap.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1))
@@ -171,7 +210,7 @@ export default async function AdminDashboard({
           </button>
         </form>
         <p className="w-full text-xs text-[#6B6B6B]">
-          Período: {new Date(from).toLocaleDateString('pt-BR')} até {new Date(to).toLocaleDateString('pt-BR')}
+          Período: {formatBrDate(from)} até {formatBrDate(to)}
         </p>
       </section>
 
@@ -185,7 +224,7 @@ export default async function AdminDashboard({
       <Section title="Visitas por dia">
         <Table
           headers={['Dia', 'Visitas']}
-          rows={visitsByDay.map(([day, count]) => [new Date(`${day}T00:00:00`).toLocaleDateString('pt-BR'), String(count)])}
+          rows={visitsByDay.map(([day, count]) => [formatBrDate(day), String(count)])}
           empty="Sem visitas registradas nesse período."
         />
       </Section>

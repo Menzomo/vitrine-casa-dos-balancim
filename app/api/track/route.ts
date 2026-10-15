@@ -9,6 +9,7 @@ type TrackBody = {
   type: string
   productId?: string
   path?: string
+  referrer?: string | null
   utm_source?: string | null
   utm_medium?: string | null
   utm_campaign?: string | null
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
       type: body.type,
       product_id: productId,
       session_id: sessionId,
-      referrer: request.headers.get('referer'),
+      referrer: body.referrer ?? null,
       utm_source: body.utm_source ?? null,
       utm_medium: body.utm_medium ?? null,
       utm_campaign: body.utm_campaign ?? null,

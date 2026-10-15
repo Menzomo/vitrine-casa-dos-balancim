@@ -21,6 +21,13 @@ export function PageTracker({ type, productId }: { type: 'pageview' | 'product_v
         type,
         productId,
         path: window.location.pathname,
+        // document.referrer é a página que trouxe o visitante (outro
+        // site, busca, rede social) — fica fixo no valor da primeira
+        // página carregada na aba, mesmo navegando entre rotas do
+        // Next via client-side routing. Diferente do cabeçalho
+        // "Referer" HTTP desse próprio fetch, que seria sempre o
+        // domínio do site (seria sempre "outro site" na origem).
+        referrer: document.referrer || null,
         utm_source: params.get('utm_source'),
         utm_medium: params.get('utm_medium'),
         utm_campaign: params.get('utm_campaign'),
