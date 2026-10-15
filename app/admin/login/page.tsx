@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, type FormEvent } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { createLoginClient } from '@/lib/supabase/login-client'
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState('')
@@ -22,7 +22,7 @@ export default function AdminLoginPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setStatus('sending')
-    const supabase = createClient()
+    const supabase = createLoginClient()
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
